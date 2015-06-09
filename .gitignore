@@ -1,0 +1,4 @@
+oradb_modules
+.idea
+*.~*
+node_modules
