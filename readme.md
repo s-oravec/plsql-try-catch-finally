@@ -1,10 +1,4 @@
-title: SQL*Plus set substitution variable from select
-date: 2015-06-04
-tags:
-- Oracle
-- PL/SQL
----
-
+# PL/SQL try-catch-finally
 
 The best example to follow would be Java implementation of `try-catch-finally`. However in PL/SQL it would get messy and the code would remind good ol' spaghetti western with epic theme - The Good, The Bad and The Ugly.
 
