@@ -4,11 +4,17 @@ CREATE OR REPLACE PACKAGE ut_try_catch_finally AS
 
     PROCEDURE before_each;
 
-    PROCEDURE fnc_try_normal_finally(d IN VARCHAR2 := 'try-catch-finally function: tries executing code, executes normally and executes finally block');
+    PROCEDURE fnc_a_try_normal_finally(d IN VARCHAR2 := 'try-catch-finally-va function: tries executing code, executes normally and executes finally block');
 
-    PROCEDURE fnc_try_catch_finally(d IN VARCHAR2 := 'try-catch-finally function: tries executing code, catches expected exception, executes finally block');
+    PROCEDURE fnc_a_try_catch_finally(d IN VARCHAR2 := 'try-catch-finally-va function: tries executing code, catches expected exception, executes finally block');
 
-    PROCEDURE fnc_try_not_catch_finally(d IN VARCHAR2 := 'try-catch-finally function: tries executing code, does not catch unexpected exception, executes finally block and raises exception');
+    PROCEDURE fnc_a_try_not_catch_finally(d IN VARCHAR2 := 'try-catch-finally-va function: tries executing code, does not catch unexpected exception, executes finally block and raises exception');
+
+    PROCEDURE fnc_b_try_normal_finally(d IN VARCHAR2 := 'try-catch-finally-vb function: tries executing code, executes normally and executes finally block');
+
+    PROCEDURE fnc_b_try_catch_finally(d IN VARCHAR2 := 'try-catch-finally-vb function: tries executing code, catches expected exception, executes finally block');
+
+    PROCEDURE fnc_b_try_not_catch_finally(d IN VARCHAR2 := 'try-catch-finally-vb function: tries executing code, does not catch unexpected exception, executes finally block and raises exception');
 
 END;
 /
@@ -79,7 +85,7 @@ CREATE OR REPLACE PACKAGE BODY ut_try_catch_finally AS
     END;
 
     --------------------------------------------------------------------------------
-    FUNCTION try_catch_finally2
+    FUNCTION fa_try_catch_finally
     (
         a_raise_on_step_in IN typ_step DEFAULT NULL,
         a_exception_in     IN typ_exception_code DEFAULT NULL
@@ -119,7 +125,7 @@ CREATE OR REPLACE PACKAGE BODY ut_try_catch_finally AS
     END;
 
     --------------------------------------------------------------------------------
-    FUNCTION try_catch_finally
+    FUNCTION fb_try_catch_finally
     (
         a_raise_on_step_in IN typ_step DEFAULT NULL,
         a_exception_in     IN typ_exception_code DEFAULT NULL
@@ -162,65 +168,13 @@ CREATE OR REPLACE PACKAGE BODY ut_try_catch_finally AS
     END;
 
     --------------------------------------------------------------------------------
-    FUNCTION try_catch_finally3
-    (
-        a_raise_on_step_in IN typ_step DEFAULT NULL,
-        a_exception_in     IN typ_exception_code DEFAULT NULL
-    ) RETURN typ_method_result IS
-        l_result typ_method_result;
-        --------------------------------------------------------------------------------
-        PROCEDURE finally IS
-        BEGIN
-            log(g_step_finally);
-            --TODO: implement finally code here
-            --TODO: do not change result here - BAD PRACTICE
-        END;
-        --------------------------------------------------------------------------------
-        FUNCTION try RETURN typ_method_result IS
-        BEGIN
-            g_raise_on_step := a_raise_on_step_in;
-            --TODO: implement try block code here
-            log(g_step_try);
-            helper_raise_on_step(a_current_step_in => g_step_try,
-                                 a_exception_in    => a_exception_in);
-            log(g_step_normal);
-            finally;
-            RETURN g_result_normal;
-        END;
-        --------------------------------------------------------------------------------
-        FUNCTION catch(a_sqlcode_in IN PLS_INTEGER) RETURN typ_method_result IS
-        BEGIN
-            dbms_output.put_line(a_sqlcode_in);
-            CASE a_sqlcode_in
-                WHEN g_expected_exception_return THEN
-                    --TODO: handle caught exception
-                    log(g_step_catch_expected);
-                    finally;
-                    RETURN g_result_catch;
-                ELSE
-                    log(g_step_catch_unexp_and_raise);
-                    finally;
-                    EXECUTE IMMEDIATE 'declare e exception; pragma exception_init(e, ' ||
-                                      a_sqlcode_in || '); begin raise e; end;';
-            END CASE;
-        END;
-    BEGIN
-        BEGIN
-            RETURN try;
-        EXCEPTION
-            WHEN OTHERS THEN
-                RETURN catch(SQLCODE);
-        END;
-    END;
-
-    --------------------------------------------------------------------------------
-    PROCEDURE fnc_try_normal_finally(d IN VARCHAR2) IS
+    PROCEDURE fnc_a_try_normal_finally(d IN VARCHAR2) IS
         l_result INTEGER;
     BEGIN
         --log
         pete_logger.log_method_description(d);
         --test
-        l_result := try_catch_finally;
+        l_result := fa_try_catch_finally;
         --assert
         pete_assert.this(has_been_called(g_step_try), 'try has been called');
         pete_assert.this(has_been_called(g_step_normal),
@@ -233,13 +187,13 @@ CREATE OR REPLACE PACKAGE BODY ut_try_catch_finally AS
     END;
 
     --------------------------------------------------------------------------------
-    PROCEDURE fnc_try_catch_finally(d IN VARCHAR2) IS
+    PROCEDURE fnc_a_try_catch_finally(d IN VARCHAR2) IS
         l_result INTEGER;
     BEGIN
         --log
         pete_logger.log_method_description(d);
         --test
-        l_result := try_catch_finally(a_raise_on_step_in => g_step_try,
+        l_result := fa_try_catch_finally(a_raise_on_step_in => g_step_try,
                                       a_exception_in     => g_expected_exception_return);
         --assert
         pete_assert.this(has_been_called(g_step_try),
@@ -255,14 +209,82 @@ CREATE OR REPLACE PACKAGE BODY ut_try_catch_finally AS
     END;
 
     --------------------------------------------------------------------------------
-    PROCEDURE fnc_try_not_catch_finally(d IN VARCHAR2) IS
+    PROCEDURE fnc_a_try_not_catch_finally(d IN VARCHAR2) IS
         l_result INTEGER;
     BEGIN
         --log
         pete_logger.log_method_description(d);
         --test
         BEGIN
-            l_result := try_catch_finally(a_raise_on_step_in => g_step_try,
+            l_result := fa_try_catch_finally(a_raise_on_step_in => g_step_try,
+                                          a_exception_in     => g_unexpected_exception);
+        EXCEPTION
+            WHEN OTHERS THEN
+                pete_assert.eq(a_expected_in => g_unexpected_exception,
+                               a_actual_in   => SQLCODE,
+                               a_comment_in  => 'unexpected exception has been re-raised');
+        END;
+        --assert
+        pete_assert.this(a_value_in   => has_been_called(g_step_try),
+                         a_comment_in => 'try has been called');
+        pete_assert.this(a_value_in   => has_been_called(g_step_catch_unexp_and_raise),
+                         a_comment_in => 'it failed with unexpected exception which has been caught');
+        pete_assert.this(a_value_in   => has_been_called(g_step_finally),
+                         a_comment_in => 'finally has been called');
+        pete_assert.is_null(a_value_in   => l_result,
+                            a_comment_in => 'returned value is null');
+    END;
+
+    --------------------------------------------------------------------------------
+    PROCEDURE fnc_b_try_normal_finally(d IN VARCHAR2) IS
+        l_result INTEGER;
+    BEGIN
+        --log
+        pete_logger.log_method_description(d);
+        --test
+        l_result := fb_try_catch_finally;
+        --assert
+        pete_assert.this(has_been_called(g_step_try), 'try has been called');
+        pete_assert.this(has_been_called(g_step_normal),
+                         ' it finished normally');
+        pete_assert.this(has_been_called(g_step_finally),
+                         'and finally has been called');
+        pete_assert.eq(a_expected_in => g_result_normal,
+                       a_actual_in   => l_result,
+                       a_comment_in  => 'function returned expected value from normal execution');
+    END;
+
+    --------------------------------------------------------------------------------
+    PROCEDURE fnc_b_try_catch_finally(d IN VARCHAR2) IS
+        l_result INTEGER;
+    BEGIN
+        --log
+        pete_logger.log_method_description(d);
+        --test
+        l_result := fb_try_catch_finally(a_raise_on_step_in => g_step_try,
+                                      a_exception_in     => g_expected_exception_return);
+        --assert
+        pete_assert.this(has_been_called(g_step_try),
+                         g_step_try || ' try has been called');
+        pete_assert.this(has_been_called(g_step_catch_expected),
+                         g_step_catch_expected ||
+                         ' it failed with expected exception which has been caught');
+        pete_assert.this(has_been_called(g_step_finally),
+                         g_step_finally || ' finally has been called');
+        pete_assert.eq(a_expected_in => g_result_catch,
+                       a_actual_in   => l_result,
+                       a_comment_in  => 'function returned expected result from catch');
+    END;
+
+    --------------------------------------------------------------------------------
+    PROCEDURE fnc_b_try_not_catch_finally(d IN VARCHAR2) IS
+        l_result INTEGER;
+    BEGIN
+        --log
+        pete_logger.log_method_description(d);
+        --test
+        BEGIN
+            l_result := fb_try_catch_finally(a_raise_on_step_in => g_step_try,
                                           a_exception_in     => g_unexpected_exception);
         EXCEPTION
             WHEN OTHERS THEN
